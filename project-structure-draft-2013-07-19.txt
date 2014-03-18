@@ -1,0 +1,457 @@
+       [ocaml-opengl] which structure for the ideal project ?
+
+  Florent Monnier monnier.florent at gmail.com
+  Fri Jul 19 22:25:01 BST 2013
+
+  ----------------------------------------------------------------------
+
+Hi,
+
+I've not made any OpenGL over the last year (only 2D), but I'm planing
+to make some 3D again soon, so I'm wondering how to make things evolve
+in the right direction, and I would like to get opinions about it.
+
+So I've started a new experimentation almost from scratch, and before
+to go further too much I would like to validate or invalidate my
+choices, based on your opinions about it.
+
+* the gl-enums use polymorphic variants
+why?
+- standard variant are more efficient but the difference is so small
+  that it can be considered negligeable.
+- polymorphic variants makes it more easy for version handling (see below)
+- possibility to remove dependencies from different modules.
+- using standard variants require that some are module packed (cf
+  glMLite) and this is ugly and tedious
+
+* the gl-enums are wrapped using a pattern matching on the ocaml side
+and only an int is send to C stub
+why?
+- the C stub is then the same for every version (see below for version handling)
+- the C stub is simpler, only Int_val() to convert every gl-enum
+- more things managed on the ocaml side, means simpler code
+- people comfotable with ocaml but not C can more easily modify the code
+- see [REF-1] at the end of this email for an example of code
+
+* each OpenGL C function stub is in its own C file
+why?
+- more easy to choose which set of functions we want to use (see
+  version handling below)
+- split code in small files, easier to find a single function, or
+  evetually make alternative versions for testing purposes.
+
+* each ocaml external function also in its own file
+why?
+- version sets also easy to generate from it (see version handling below)
+- also easy to have alternative versions for testing purposes
+- for example for glBegin we have func_glBegin.{ml,mli} and func_glBegin_stub.c
+
+* two ocaml interfaces are provided,
+ one with LablGL's functions style, and
+ one with native OpenGL functions names (like in glMLite and GLcaml)
+ (I call the first one the Labeled interface, because it's similar to LablGL)
+ (I call the second one the Garrys's interface,
+  I offer an orange from organic farming for the one who guess why)
+why?
+- some people prefer the LablGL style, some people prefer native
+  OpenGL functions style,
+  so how to choose ? just don't choose, take them both to make everyone happy.
+- this is not an issue, the C stub is the same for both, and the way
+  gl-enums are managed makes it easy to
+
+* one module for each OpenGL version,
+  GL11 provides all the function set and gl-enums from OpenGL version 1.1,
+  GL21 for OGL 2.1, GL33 for 3.3, and ES1, ES2, and so on...
+why?
+- Then we know exactly where we are.
+- what if I want my program to work with both OGL 2.1 and OGL 3.3 ?
+  see next point
+
+* we may generate modules that are intersection sets between 2 or more
+  OpenGL versions
+why?
+- we also know exactly where we are, we're writing for target that may
+use OGL 2.1 or 3.3
+- what if I want a very large version target (even every OGL version)
+? see next point
+
+# If I want my program to work for large target, from OGL 1.1 up to 4.1
+  then I just write several implementations, one with the fixed
+  pipeline for old computers,
+  and one with modern style VBO+GLSL, in each implementation we are
+  sure of which
+  functions we use because we only open the matching module :
+open GL11
+or
+open GL33
+  then at run-time we can test which version of opengl is running
+  and select the right implementation
+
+* to generate each module version, we use an over simple script,
+  with over simple input data.
+why?
+- because we love KISS programming
+- please no XML hell when not needed
+- see [REF-2] at the end of this email for an example of input data
+- we generate each version module with the set of functions that
+  matches this input
+- generating each gl-enum is also quite straight foreward
+- if very KISS everyone, even beginners, can modify it
+- input data that can be shared with other projects (REF-2 is actually
+  taken from
+  another project, but only contains functions, gl-enums still have to be added)
+
+* we use a wrangler lib by default, even on Linux.
+why?
+- because for portability with MS/Windows we have to
+- even on Linux it's better to. glMLite chooses an OpenGL version at
+  compile time,
+  it's lame for packaging purpose where when the package is compiled
+  we don't know yet
+  which OGL version will be on the target computer where the package
+  will finally
+  be installed and run.
+  It was quite OK to do so until recently, because most people were
+  using OGL 2.1 for a while,
+  but now more and more people will use more modern versions.
+  So we now need to go further.
+
+* so which wrangler lib? glew?
+http://www.opengl.org/wiki/OpenGL_Loading_Library
+http://rastergrid.com/blog/2010/03/sad-facts-about-opengl-extension-libraries/
+I'm not sure which to use, glew seems to be the most used and adviced,
+but as long as I know there is no perfect one that has all the advantages.
+Each has its pros and cons, advantages and drawbacks.
+Last time I browsed about opengl wrangler libs comparisions was maybe
+more than one year ago. I don't know if the situation has evolved nowaday.
+/ Maybe the project should make it switchable at compile time,
+so each user can decide which suits the best his/her needs.
+The default recommanded for Linux packaging could be glew.
+The default for people who don't know and who are compiling the
+sources could be SDL2.
+- currently my experimentation uses SDL2 wrangling mechanism
+why?
+- so that I'm using only one single lib, for windowing/user input, and
+  for OGL wrangling (and even for pure 2D), and even sound
+- SDL2 provides everything we need, even the OpenGL headers.
+- SDL2 is very portable (should we even say a portability Heaven?)
+even if still a devel version (oops no now RC), compiles out of the box on both
+Linux and Cygwin (and probably the same for most used environments)
+On cygwin compiles out of the box even with MingW's toolchain
+(just do export CC="/bin/i686-w64-mingw32-gcc" before ./configure and make)
+
+* should the OpenGL bindings provide highier level things?
+(like memory management, or anykind of abstraction or simplification)
+In my opinion no. Or at least not at the base modules.
+why?
+IMHO the functions should be useable at their low-level level, and so
+the project should only relay the opengl functions calls IMO.
+- But building other modules on top of the lowlevel ones or next to it
+could be a good idea IMO.
+  (like I tryed in glmlite with FunGL, and Ogl_draw / Ogl_matrix)
+
+* How to manage buffers?
+/ BAs?
+/ Strings?
+/ Arrays?
+/ LablGL's Raw?
+/ any other suggestions?
+pros and cons :
+- BA: nice for the absence of any dependency,
+  but in glMLite I get segfault with buffers that comes from mapped memory
+  BAs are very slow to alloc and finalise, which is an issue if
+  we want to do it between two frames at runtime.
+- Strings: I haven't tried yet, but I seriously envisage this option
+  also nice for absence of dependency for interactions with other components
+  storing 16bits/32bits ints / floats in it could still be easily
+  managed with a dedicated module
+  Strings are faster to alloc and finalise than BAs.
+- Arrays: not possible, we need 32 bits floats not doubles,
+  also not possible for ints of various size and even mini-floats
+- a dedicated module like LablGL's Raw,
+  we could tailor it for what we need,
+  but IMHO it should be a separated project for the dependency removing
+  of other components that would have to interoperate with it.
+  Other projects like pure 2D things could also use such a project.
+- the opengl functions that would need buffer management could also be
+  isolated in a separated modules and then different options could be
+  written and tried.
+  (which is why in glmlite VertArray and VBO modules were separated
+  from the main module,
+   thinking that I could try something else than BAs later (which i never did)
+   but is it a good idea?)
+so:
+I really don't know what would be the best option(s), maybe Raw or strings,
+but for strings would need to try and experiment with it to get a
+better opinion,
+and to see if we don't have segfaults like with BAs with video mapped memory.
+Or if we provide several options, is it a good idea? How to integrate the
+alternatives together with the other functions? Sub-modules? or different .cma?
+or suffixes?
+
+* Which type for matrices?
+I personally prefer using float arrays like I do in glMLite.
+why?
+- this is highly comfortable to not have any dependency
+@ but I do understand people willing other kind of types,
+  as i would like to make something that other people would
+  want to use, i would like to get the more opinions possible
+  to see what most people think about it, and maybe try to
+  please the majority
+
+* which type for vectors, points, colors?
+I personally prefer tuples like I now do in all my modules.
+why?
+- this is highly comfortable to not have any dependency
+- but idem than for matrices (the @ point)
+
+* Which license?
+- If I continue this experimentation further to make it reach a usable
+  state it would be a liberal license.
+- but MIT, BSD, zlib/png are even not simple enough for me,
+  I still don't like their conditions and restrictions that I think are useless.
+- I'm thinking to use this one below that is zlib with its restriction removed:
+"""
+This software is provided "AS-IS", without any express or implied
+warranty.  In no event will the authors be held liable for any damages
+arising from the use of this software.
+
+Permission is granted to anyone to use this software for any purpose,
+including commercial applications, and to alter it and redistribute it
+freely.
+"""
+I still don't like the use of the word "software" which excludes the
+documentations, eventually not clear about the tests (strictly
+speaking it's not part of the software), and also exclude images that
+could be joined for testing purpose. An image is not software.
+I talked about it with Richard Jones (about another piece of code) who
+strongly discourages me to use a non standard license.
+What are your opinions about it?
+Would license options be an acceptable solution?
+like in this project:
+https://github.com/blue-prawn/ocaml-xlib/blob/master/README.txt
+see the sections "LICENSE" and "ALTERNATIVE LICENSES" in the README file.
+
+* which build tool?
+/ make?
+/ ocamlbuild?
+/ ocp-build?
+- none
+why?
+- not really none, I just mean I'm thinking it could be managed in
+  separated projects,
+  like a set of Makefile that would share the same directory hierarchy,
+  like the sources of Mesa do,
+  so that tarballs could be untared in the same place a produce a
+  consistent source directory ready to be build.
+  Would be easier to deprecate a build if it's outside of the main project,
+  but I'm not sure I want to use something else than make yet.
+
+------
+
+If you have any comments, opinions, advices, suggestions, critics,
+trolls, crazy ideas about all this, please share!
+Even if you have completely other ideas about what should be the ideal
+ocaml-opengl bindings, I would appreciate to hear about it.
+
+Also notice that if I don't take webgl into considarations, it's only
+because I've not started to learn it yet, so I know nothing about it
+yet.
+If you have ideas about if and how it should be taken into account
+into a bindings for desktop programs, please feel free to talk about
+it.
+
+
+=== REF SAMPLES ===
+
+[REF-1] :
+
+>From the .ml part :
+type gl_enum = Gl_enum.t
+
+(* each gl-enums will be (eventually) different in each module version,
+   in module GL21 `GL_QUADS, `GL_QUAD_STRIP and `GL_POLYGON
+   will be there but not in GL32.
+   And GL33 and GL41 will have additional ones:
+   `GL_LINES_ADJACENCY
+   `GL_LINE_STRIP_ADJACENCY
+   `GL_TRIANGLES_ADJACENCY
+   `GL_TRIANGLE_STRIP_ADJACENCY
+   So each gl-enum would be generated accordingly for each version module *)
+type primitive = [
+  | `GL_POINTS
+  | `GL_LINES
+  | `GL_LINE_LOOP
+  | `GL_LINE_STRIP
+  | `GL_TRIANGLES
+  | `GL_TRIANGLE_STRIP
+  | `GL_TRIANGLE_FAN
+  | `GL_QUADS  (** deprecated in core profile *)
+  | `GL_QUAD_STRIP  (** deprecated in core profile *)
+  | `GL_POLYGON  (** deprecated in core profile *)
+  | `GL_LINES_ADJACENCY  (** new in 3.3 and 4.1 *)
+  | `GL_LINE_STRIP_ADJACENCY  (** new in 3.3 and 4.1 *)
+  | `GL_TRIANGLES_ADJACENCY  (** new in 3.3 and 4.1 *)
+  | `GL_TRIANGLE_STRIP_ADJACENCY  (** new in 3.3 and 4.1 *)
+  ]
+
+let int_of_primitive = function
+  | `GL_POINTS          -> Gl_enum.gl_points
+  | `GL_LINES           -> Gl_enum.gl_lines
+  | `GL_LINE_LOOP       -> Gl_enum.gl_line_loop
+  | `GL_LINE_STRIP      -> Gl_enum.gl_line_strip
+  | `GL_TRIANGLES       -> Gl_enum.gl_triangles
+  | `GL_TRIANGLE_STRIP  -> Gl_enum.gl_triangle_strip
+  | `GL_TRIANGLE_FAN    -> Gl_enum.gl_triangle_fan
+  | `GL_QUADS           -> Gl_enum.gl_quads
+  | `GL_QUAD_STRIP      -> Gl_enum.gl_quad_strip
+  | `GL_POLYGON         -> Gl_enum.gl_polygon
+
+external glBegin : gl_enum -> unit = "caml_glBegin" "noalloc"
+let glBegin prim =
+  glBegin (int_of_primitive prim)
+
+let bit_of_clear_buffer = function
+  | `GL_COLOR_BUFFER      -> Gl_enum.gl_color_buffer_bit
+  | `GL_DEPTH_BUFFER      -> Gl_enum.gl_depth_buffer_bit
+  | `GL_ACCUM_BUFFER      -> Gl_enum.gl_accum_buffer_bit
+  | `GL_STENCIL_BUFFER    -> Gl_enum.gl_stencil_buffer_bit
+
+let enum_lor = Gl_enum.(lor)
+
+let int_of_clear_buffer lst =
+  List.fold_left (fun mask v ->
+    enum_lor mask (bit_of_clear_buffer v)
+  ) Gl_enum.zero lst
+
+external glClear : gl_enum -> unit = "caml_glClear" "noalloc"
+let glClear buffers =
+  glClear (int_of_clear_buffer buffers)
+
+
+>From .mli part :
+val glBegin : primitive -> unit
+val glClear : clear_buffer list -> unit
+
+cat gl_funcs/stub_glBegin.c
+
+CAMLprim value
+caml_glBegin(value prim)
+{
+    glBegin(Long_val(prim));
+    return Val_unit;
+}
+
+cat gl_funcs/stub_glClear.c
+
+CAMLprim value
+caml_glClear(value mask)
+{
+    glClear(Int_val(mask));
+    return Val_unit;
+}
+
+>From the Labeled interface :
+- module GlClear :
+
+type shape = [
+  | `points
+  | `lines
+  | `line_loop
+  | `line_strip
+  | `triangles
+  | `triangle_strip
+  | `triangle_fan
+  | `quads
+  | `quad_strip
+  | `polygon
+  ]
+
+let int_of_shape = function
+  | `points           -> Gl_enum.gl_points
+  | `lines            -> Gl_enum.gl_lines
+  | `line_loop        -> Gl_enum.gl_line_loop
+  | `line_strip       -> Gl_enum.gl_line_strip
+  | `triangles        -> Gl_enum.gl_triangles
+  | `triangle_strip   -> Gl_enum.gl_triangle_strip
+  | `triangle_fan     -> Gl_enum.gl_triangle_fan
+  | `quads            -> Gl_enum.gl_quads
+  | `quad_strip       -> Gl_enum.gl_quad_strip
+  | `polygon          -> Gl_enum.gl_polygon
+
+external begins : gl_enum -> unit = "caml_glBegin" "noalloc"
+let begins shape =
+  begins (int_of_shape shape)
+
+- module GlDraw :
+
+let bit_of_clear_buffer = function
+  | `color      -> Gl_enum.gl_color_buffer_bit
+  | `depth      -> Gl_enum.gl_depth_buffer_bit
+  | `accum      -> Gl_enum.gl_accum_buffer_bit
+  | `stencil    -> Gl_enum.gl_stencil_buffer_bit
+
+let int_of_clear_buffer lst =
+  List.fold_left (fun mask v ->
+    enum_lor mask (bit_of_clear_buffer v)
+  ) Gl_enum.zero lst
+
+external clear : gl_enum -> unit = "caml_glClear" "noalloc"
+let clear buffers =
+  clear (int_of_clear_buffer buffers)
+
+
+>From file gl_enum.ml :
+(* this file not generated, because gl-enums values never change *)
+(* this file just reformated from C to ocaml code from the GL.h header
+   with some interactive regexps in vim *)
+
+type t = int
+
+let ( lor ) = ( lor )
+let zero = 0
+
+(* Primitives *)
+let gl_points                         = 0x0000
+let gl_lines                          = 0x0001
+let gl_line_loop                      = 0x0002
+let gl_line_strip                     = 0x0003
+let gl_triangles                      = 0x0004
+let gl_triangle_strip                 = 0x0005
+let gl_triangle_fan                   = 0x0006
+let gl_quads                          = 0x0007
+let gl_quad_strip                     = 0x0008
+let gl_polygon                        = 0x0009
+
+
+>From file gl_enum.mli :
+type t
+
+val ( lor ) : t -> t -> t
+
+val zero : t
+
+val gl_points : t
+val gl_lines : t
+val gl_line_loop : t
+val gl_line_strip : t
+val gl_triangles : t
+val gl_triangle_strip : t
+val gl_triangle_fan : t
+val gl_quads : t
+val gl_quad_strip : t
+val gl_polygon : t
+
+
+[REF-2] :
+
+glAccum                               1.1  1.3  .    2.1  .    .    .
+glBegin                               1.1  1.3  .    2.1  .    .    .
+glBindFramebuffer                     .    .    .    .    3.3  4.1  es2
+glClipPlanef                          1.1  1.3  es1  2.1  .    .    .
+GL_QUADS                              1.1  1.3  es1  2.1  3.3  4.1  es2
+GL_TRIANGLE_STRIP_ADJACENCY           .    .    .    .    3.3  4.1  ?
+
+-- 
+Best Regards
+Florent

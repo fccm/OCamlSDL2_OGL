@@ -7,6 +7,10 @@ The initial public draft announcement for this project:
 
 http://lists.ocaml.org/pipermail/opengl/2013-July/thread.html
 
+or copied in the file:
+
+project-structure-draft-2013-07-19.txt
+
 ## Intro
 
 OCamlSDL2_OGL should bring you access to OpenGL through the SDL2 library from OCaml
