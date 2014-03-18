@@ -1,10 +1,11 @@
 # OCaml and SDL 2.0 + OpenGL
 
-The initial public draft announcement for this project:
-http://lists.ocaml.org/pipermail/opengl/2013-July/thread.html
-
 ![OCaml with SDL_gl](
 http://openclipart.org/image/250px/svg_to_png/117463/Teapot-silhouette-by-Rones.png)
+
+The initial public draft announcement for this project:
+
+http://lists.ocaml.org/pipermail/opengl/2013-July/thread.html
 
 ## Intro
 
