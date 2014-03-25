@@ -1,18 +1,9 @@
-       [ocaml-opengl] which structure for the ideal project ?
+## Which structure for a new OCaml+OpenGL project ?
 
-  Florent Monnier monnier.florent at gmail.com
-  Fri Jul 19 22:25:01 BST 2013
+Here is a draft about how to make a future OCaml+OpenGL bindings.
 
-  ----------------------------------------------------------------------
-
-Hi,
-
-I've not made any OpenGL over the last year (only 2D), but I'm planing
-to make some 3D again soon, so I'm wondering how to make things evolve
-in the right direction, and I would like to get opinions about it.
-
-So I've started a new experimentation almost from scratch, and before
-to go further too much I would like to validate or invalidate my
+This is the beginning of a new experimentation almost from scratch, and
+before to go further too much I would like to validate or invalidate my
 choices, based on your opinions about it.
 
 * the gl-enums use polymorphic variants
@@ -25,7 +16,7 @@ why?
   glMLite) and this is ugly and tedious
 
 * the gl-enums are wrapped using a pattern matching on the ocaml side
-and only an int is send to C stub
+  and only an int is send to C stub
 why?
 - the C stub is then the same for every version (see below for version handling)
 - the C stub is simpler, only Int_val() to convert every gl-enum
@@ -47,11 +38,11 @@ why?
 - for example for glBegin we have func_glBegin.{ml,mli} and func_glBegin_stub.c
 
 * two ocaml interfaces are provided,
- one with LablGL's functions style, and
- one with native OpenGL functions names (like in glMLite and GLcaml)
- (I call the first one the Labeled interface, because it's similar to LablGL)
- (I call the second one the Garrys's interface,
-  I offer an orange from organic farming for the one who guess why)
+  one with LablGL's functions style, and
+  one with native OpenGL functions names (like in glMLite and GLcaml)
+  (I call the first one the Labeled interface, because it's similar to LablGL)
+  (I call the second one the Garrys's interface,
+   I offer an orange from organic farming for the one who guess why)
 why?
 - some people prefer the LablGL style, some people prefer native
   OpenGL functions style,
@@ -71,9 +62,9 @@ why?
   OpenGL versions
 why?
 - we also know exactly where we are, we're writing for target that may
-use OGL 2.1 or 3.3
-- what if I want a very large version target (even every OGL version)
-? see next point
+  use OGL 2.1 or 3.3
+- what if I want a very large version target (even every OGL version)?
+  see next point
 
 # If I want my program to work for large target, from OGL 1.1 up to 4.1
   then I just write several implementations, one with the fixed
@@ -81,9 +72,9 @@ use OGL 2.1 or 3.3
   and one with modern style VBO+GLSL, in each implementation we are
   sure of which
   functions we use because we only open the matching module :
-open GL11
-or
-open GL33
+    open GL11
+   or
+    open GL33
   then at run-time we can test which version of opengl is running
   and select the right implementation
 
@@ -141,8 +132,8 @@ On cygwin compiles out of the box even with MingW's toolchain
 (just do export CC="/bin/i686-w64-mingw32-gcc" before ./configure and make)
 
 * should the OpenGL bindings provide highier level things?
-(like memory management, or anykind of abstraction or simplification)
-In my opinion no. Or at least not at the base modules.
+  (like memory management, or anykind of abstraction or simplification)
+  In my opinion no. Or at least not at the base modules.
 why?
 IMHO the functions should be useable at their low-level level, and so
 the project should only relay the opengl functions calls IMO.
@@ -412,16 +403,16 @@ let ( lor ) = ( lor )
 let zero = 0
 
 (* Primitives *)
-let gl_points                         = 0x0000
-let gl_lines                          = 0x0001
-let gl_line_loop                      = 0x0002
-let gl_line_strip                     = 0x0003
-let gl_triangles                      = 0x0004
-let gl_triangle_strip                 = 0x0005
-let gl_triangle_fan                   = 0x0006
-let gl_quads                          = 0x0007
-let gl_quad_strip                     = 0x0008
-let gl_polygon                        = 0x0009
+let gl_points             = 0x0000
+let gl_lines              = 0x0001
+let gl_line_loop          = 0x0002
+let gl_line_strip         = 0x0003
+let gl_triangles          = 0x0004
+let gl_triangle_strip     = 0x0005
+let gl_triangle_fan       = 0x0006
+let gl_quads              = 0x0007
+let gl_quad_strip         = 0x0008
+let gl_polygon            = 0x0009
 
 
 >From file gl_enum.mli :
@@ -452,6 +443,3 @@ glClipPlanef                          1.1  1.3  es1  2.1  .    .    .
 GL_QUADS                              1.1  1.3  es1  2.1  3.3  4.1  es2
 GL_TRIANGLE_STRIP_ADJACENCY           .    .    .    .    3.3  4.1  ?
 
--- 
-Best Regards
-Florent
